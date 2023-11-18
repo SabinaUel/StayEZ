@@ -47,6 +47,13 @@ const bookingSchema = new mongoose.Schema(
     paidAt: {
       type: Date,
     },
+    isCancelled: {
+      type: Boolean,
+      default: false,
+    },
+    cancelledAt: {
+      type: Date,
+    },
   },
   {
     strictPopulate: false, // add this option to disable strict populate
