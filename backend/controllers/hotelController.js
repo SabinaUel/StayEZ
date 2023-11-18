@@ -1,24 +1,52 @@
 import asyncHandler from '../middleware/asyncHandler.js';
 import Hotel from '../models/hotelModel.js';
 
-// @desc    Fetch all Hotels
-// @route   GET /api/Hotels
-// @access  Public
 const getHotels = asyncHandler(async (req, res) => {
   const pageSize = process.env.PAGINATION_LIMIT;
   const page = Number(req.query.pageNumber) || 1;
 
   const keyword = req.query.keyword
     ? {
-        name: {
-          $regex: req.query.keyword,
-          $options: 'i',
-        },
+        $or: [
+          {
+            address: {
+              $regex: req.query.keyword,
+              $options: 'i',
+            },
+          },
+          {
+            city: {
+              $regex: req.query.keyword,
+              $options: 'i',
+            },
+          },
+          {
+            postcode: {
+              $regex: req.query.keyword,
+              $options: 'i',
+            },
+          },
+        ],
       }
     : {};
 
-  const count = await Hotel.countDocuments({ ...keyword });
-  const hotels = await Hotel.find({ ...keyword })
+  let geolocationQuery = {};
+  if (req.query.latitude && req.query.longitude && req.query.radius) {
+    const { latitude, longitude, radius } = req.query;
+    geolocationQuery = {
+      location: {
+        $geoWithin: {
+          $centerSphere: [
+            [parseFloat(longitude), parseFloat(latitude)],
+            radius / 3963.2, // Radius in miles
+          ],
+        },
+      },
+    };
+  }
+
+  const count = await Hotel.countDocuments({ ...keyword, ...geolocationQuery });
+  const hotels = await Hotel.find({ ...keyword, ...geolocationQuery })
     .limit(pageSize)
     .skip(pageSize * (page - 1));
 
@@ -76,6 +104,7 @@ const updateHotel = asyncHandler(async (req, res) => {
     city,
     country,
     numRooms,
+    contact_no,
   } = req.body;
 
   const hotel = await Hotel.findById(req.params.id);
@@ -90,6 +119,7 @@ const updateHotel = asyncHandler(async (req, res) => {
     hotel.city = city;
     hotel.country = country;
     hotel.numRooms = numRooms;
+    hotel.contact_no = contact_no;
 
     const updatedHotel = await hotel.save();
     res.json(updatedHotel);
@@ -163,6 +193,57 @@ const getTopHotels = asyncHandler(async (req, res) => {
   res.json(hotel);
 });
 
+// @desc    Fetch all Hotels
+// @route   GET /api/hotels/search
+// @access  Public
+const getHotelsByLocation = asyncHandler(async (req, res) => {
+  const pageSize = process.env.PAGINATION_LIMIT;
+  const page = Number(req.query.pageNumber) || 1;
+
+  const keyword = req.query.keyword
+    ? {
+        name: {
+          $regex: req.query.keyword,
+          $options: 'i',
+        },
+      }
+    : {};
+  console.log('req query', req.query);
+
+  // Check if geolocation parameters are provided in the request
+  if (req.query.latitude && req.query.longitude && req.query.radius) {
+    try {
+      const { latitude, longitude, radius } = req.query;
+
+      // Use Mongoose to find hotels within the specified radius of the geolocation
+      const hotels = await Hotel.find({
+        location: {
+          $geoWithin: {
+            $centerSphere: [
+              [parseFloat(longitude), parseFloat(latitude)],
+              radius / 3963.2,
+            ], // Radius in miles
+          },
+        },
+      });
+      console.log('hotels', hotels);
+
+      res.json(hotels);
+    } catch (error) {
+      res.status(500).json({ message: 'Server error' });
+    }
+  } else {
+    // If geolocation parameters are not provided, perform the regular search
+    const count = await Hotel.countDocuments({ ...keyword });
+    const hotels = await Hotel.find({ ...keyword })
+      .limit(pageSize)
+      .skip(pageSize * (page - 1));
+
+    res.json({ hotels, page, pages: Math.ceil(count / pageSize) });
+  }
+});
+
+// ...
 export {
   getHotels,
   getHotelById,
@@ -171,4 +252,5 @@ export {
   deleteHotel,
   createHotelReview,
   getTopHotels,
+  getHotelsByLocation,
 };

@@ -43,6 +43,21 @@ const HotelSchema = mongoose.Schema(
     country: {
       type: String,
     },
+    contact_no: {
+      type: String,
+    },
+
+    location: {
+      type: {
+        type: String, // Don't do `{ location: { type: String } }`
+        enum: ['Point'], // 'location.type' must be 'Point'
+        required: true,
+      },
+      coordinates: {
+        type: [Number],
+        required: true,
+      },
+    },
 
     description: {
       type: String,

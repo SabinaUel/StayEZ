@@ -8,6 +8,7 @@ import {
   deleteHotel,
   createHotelReview,
   getTopHotels,
+  getHotelsByLocation,
 } from '../controllers/hotelController.js';
 import { protect, admin } from '../middleware/authMiddleware.js';
 import checkObjectId from '../middleware/checkObjectId.js';
@@ -20,5 +21,6 @@ router
   .get(checkObjectId, getHotelById)
   .put(protect, admin, checkObjectId, updateHotel)
   .delete(protect, admin, checkObjectId, deleteHotel);
+router.route('/search').post(getHotelsByLocation);
 
 export default router;
